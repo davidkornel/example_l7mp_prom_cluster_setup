@@ -1,0 +1,22 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  creationTimestamp: null
+  labels:
+    prometheus: prometheus
+    role: alert-rules
+  name: prometheus-example-rules
+spec:
+  groups:
+  - name: ./example.rules
+    rules:
+    - alert: ExampleAlert
+      expr: vector(1)
+  - name: ./ctrlr_list.rules
+    rules:
+    - alert: controller-listener-over-five
+      expr: controller_listener_requests_total > 5
+  - name: ./ctrlr_list_six.rules
+    rules:
+    - alert: controller-listener-over-six
+      expr: controller_listener_requests_total > 10

@@ -1,0 +1,16 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: l7mp-prometheus
+  labels:
+    app: l7mp-prometheus
+spec:
+  selector:
+    app: l7mp-prometheus
+  ports:
+  - name: http
+    port: 8080
+    targetPort: 8080
+    protocol: TCP
+  - name: ctrlr-list
+    port: 1234

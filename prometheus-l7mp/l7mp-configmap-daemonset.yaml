@@ -1,0 +1,88 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: l7mp-prometheus
+  labels:
+    app: l7mp-prometheus
+    metrics: l7mp
+spec:
+  selector:
+    matchLabels:
+      app: l7mp-prometheus
+  template:
+    metadata:
+      labels:
+        app: l7mp-prometheus
+    spec:
+      volumes:
+        - name: l7mp-prometheus-config
+          configMap:
+            name: l7mp-prometheus
+      containers: 
+      - name: l7mp
+        image: l7mp
+        imagePullPolicy: Never
+        command: [ "node" ]
+        args: [ "l7mp-proxy.js", "-c", "config/l7mp-prometheus.yaml", "-s", "-l", "silly"]
+        ports:
+          - containerPort: 8080
+            #http for svc monitor
+            #name: http 
+            #web for podmonitor
+            name: web
+          - containerPort: 1234
+            name: ctrlr-list
+        volumeMounts:
+          - name: l7mp-prometheus-config
+            mountPath: /app/config
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: l7mp-prometheus
+data:
+  l7mp-prometheus.yaml: |
+    admin:
+      log_level: info
+      log_file: stdout
+      access_log_path: /tmp/admin_access.log
+    listeners:
+      - name: controller_listener
+        spec: { protocol: HTTP, port: 1234 }
+        rules:
+          - action:
+              route:
+                destination: l7mp-controller
+      - name: udp-listener
+        spec: { protocol: UDP, port: 15000 }
+        rules:
+          - action:
+              route:
+                destination:
+                  spec: { protocol: UDP, port: 16000 }
+                  endpoints:
+                    - name: receiver
+                      spec: { address:  "127.0.0.1"}
+                ingress:
+                  - udp-ingress-metric-counter
+                egress:
+                  - udp-egress-metric-counter
+      - name: prometheus_listener
+        spec: { protocol: HTTP, port: 8080 }
+        rules:
+          - name: rule-prom
+            match: {op: starts, path: '/HTTP/url/path', value: '/metrics'}
+            action:
+              route:
+                destination: prometheus-cluster
+    clusters:
+      - name: l7mp-controller
+        spec: { protocol: L7mpController }
+      - name: prometheus-cluster
+        spec: { protocol: Prometheus }
+      - name: udp-ingress-metric-counter
+        spec: { protocol: Metric }
+      - name: udp-egress-metric-counter
+        spec: { protocol: Metric }
